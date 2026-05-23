@@ -1,6 +1,8 @@
 # Test case
 import unittest
 
+from PySide6.QtGui import QFontMetrics
+
 from src.config import config
 from ok.test.TaskTestCase import TaskTestCase
 from ok.gui.tasks.ConfigItemFactory import config_widget
@@ -85,6 +87,54 @@ class TestMyOneTimeTask(TaskTestCase):
         )
         widget.list_modified(["Available Drop Down Value 1", "Not Available"])
         self.assertEqual(["Available Drop Down Value 1"], self.task.config["Drop Down Options Config"])
+
+    def test_string_config_input_uses_minimum_width_when_empty(self):
+        widget = config_widget(
+            self.task.config_type,
+            self.task.config_description,
+            self.task.config,
+            "String Config",
+            self.task.config.get("String Config"),
+            self.task,
+        )
+
+        widget.line_edit.setText("")
+        self.assertEqual(100, widget.line_edit.width())
+        self.assertEqual(100, widget.line_edit.minimumWidth())
+        widget.line_edit.setText("a")
+        self.assertEqual(100, widget.line_edit.width())
+        long_text = "String Value With Enough Content"
+        widget.line_edit.setText(long_text)
+        expected_width = (
+            QFontMetrics(widget.line_edit.font()).horizontalAdvance(long_text)
+            + widget.HORIZONTAL_PADDING
+        )
+        self.assertEqual(expected_width, widget.line_edit.width())
+        self.task.config["String Config"] = self.task.default_config["String Config"]
+
+    def test_text_edit_config_uses_minimum_width_when_empty(self):
+        widget = config_widget(
+            self.task.config_type,
+            self.task.config_description,
+            self.task.config,
+            "Text Edit Config",
+            self.task.config.get("Text Edit Config"),
+            self.task,
+        )
+
+        widget.text_edit.setText("")
+        self.assertEqual(200, widget.text_edit.width())
+        self.assertEqual(200, widget.text_edit.minimumWidth())
+        widget.text_edit.setText("a")
+        self.assertEqual(200, widget.text_edit.width())
+        long_line = "Text Edit Value With Enough Content To Need More Width"
+        widget.text_edit.setText(f"Short\n{long_line}")
+        expected_width = (
+            QFontMetrics(widget.text_edit.font()).horizontalAdvance(long_line)
+            + widget.HORIZONTAL_PADDING
+        )
+        self.assertEqual(expected_width, widget.text_edit.width())
+        self.task.config["Text Edit Config"] = self.task.default_config["Text Edit Config"]
 
     def test_run_shows_config_values(self):
         self.task.config.reset_to_default()
