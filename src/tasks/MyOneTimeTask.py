@@ -2,6 +2,7 @@ import re
 
 from qfluentwidgets import FluentIcon
 
+from ok import og
 from src.tasks.MyBaseTask import MyBaseTask
 
 
@@ -9,26 +10,98 @@ class MyOneTimeTask(MyBaseTask):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.name = "测试任务"
-        self.description = "用户点击时调用run方法"
+        self.name = "Configuration Demo Task"
+        self.description = "Demonstrates every configuration widget for English to Chinese translation."
         self.icon = FluentIcon.SYNC
         self.default_config.update({
-            '下拉菜单选项': "第一",
-            '是否选项默认支持': False,
-            'int选项': 1,
-            '文字框选项': "默认文字",
-            '长文字框选项': "默认文字默认文字默认文字默认文字默认文字默认文字默认文字默认文字默认文字默认文字默认文字默认文字默认文字默认文字默认文字默认文字默认文字默认文字默认文字",
-            'list选项': ['第一', '第二', '第3'],
+            "Drop Down Config": "Drop Down Value 1",
+            "Boolean Config": True,
+            "Integer Config": 1,
+            "Float Config": 1.1,
+            "String Config": "String Value",
+            "Text Edit Config": "Text Edit Value",
+            "List Config": ["List Value 1", "List Value 2"],
+            "Drop Down Options Config": ["Available Drop Down Value 1"],
+            "Multi Selection Config": ["Multi Selection Value 1", "Multi Selection Value 2"],
+            "Sub Boolean Config": False,
+            "Sub String Config": "Sub String Value",
+            "Sub Float Config": 2.2,
+            "Game Hotkey Config": {},
         })
-        self.config_type["下拉菜单选项"] = {'type': "drop_down",
-                                      'options': ['第一', '第二', '第3']}
+        self.config_description.update({
+            "Drop Down Config": "Drop-down configuration with translated option values.",
+            "String Config": "Single-line string configuration with a translated value.",
+            "Text Edit Config": "Multi-line string configuration with a translated value.",
+            "Drop Down Options Config": "Dropdown option list restricted to available translated values.",
+            "Game Hotkey Config": "Open the shared global configuration example.",
+            "Button Config": "Button configuration that displays all current values.",
+        })
+        self.config_type.update({
+            "Drop Down Config": {
+                "type": "drop_down",
+                "options": ["Drop Down Value 1", "Drop Down Value 2"],
+                "sub_configs": {
+                    "Drop Down Value 1": ["Sub Boolean Config"],
+                    "Drop Down Value 2": ["Sub String Config", "Sub Float Config"],
+                },
+            },
+            "Text Edit Config": {"type": "text_edit"},
+            "Drop Down Options Config": {
+                "type": "drop_down",
+                "allow_duplication": True,
+                "options_available": [
+                    "Available Drop Down Value 1",
+                    "Available Drop Down Value 2",
+                    "Available Drop Down Value 3",
+                ],
+            },
+            "Multi Selection Config": {
+                "type": "multi_selection",
+                "options": [
+                    "Multi Selection Value 1",
+                    "Multi Selection Value 2",
+                    "Multi Selection Value 3",
+                ],
+            },
+            "Game Hotkey Config": {"type": "global"},
+            "Button Config": {
+                "type": "button",
+                "text": "Button Value",
+                "callback": self.show_config_values,
+            },
+        })
 
     def run(self):
-        self.log_info('测试任务开始运行!', notify=True)
-        texts = self.ocr()
-        self.log_info(f'ocr {texts}', notify=True)
-        self.click(0.47, 0.60, after_sleep=1)
-        self.log_info('日常任务运行完成!', notify=True)
+        self.show_config_values()
+        self.log_info("Configuration values displayed.", notify=True)
+
+    def validate_config(self, key, value):
+        if key == "Drop Down Config" and value not in self.config_type[key]["options"]:
+            return "Select one of the available drop-down values."
+        if key == "Multi Selection Config":
+            options = self.config_type[key]["options"]
+            if any(item not in options for item in value):
+                return "Select only available multi-selection values."
+        if key == "Drop Down Options Config":
+            options = self.config_type[key]["options_available"]
+            if any(item not in options for item in value):
+                return "Select only available drop-down option values."
+
+    def show_config_values(self):
+        for key, value in self.config.items():
+            if key == "Game Hotkey Config":
+                continue
+            self.info_set(key, self.translate_config_value(value))
+        self.info_set("Game Hotkey Config", dict(self.get_global_config("Game Hotkey Config")))
+
+    def translate_config_value(self, value):
+        if isinstance(value, bool):
+            return og.app.tr(str(value))
+        if isinstance(value, str):
+            return og.app.tr(value)
+        if isinstance(value, list):
+            return [og.app.tr(item) for item in value]
+        return value
 
     def find_some_text_on_bottom_right(self):
         return self.ocr(box="bottom_right",match="商城", log=True) #指定box以提高ocr速度

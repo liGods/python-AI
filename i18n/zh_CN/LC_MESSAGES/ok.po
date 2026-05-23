@@ -83,3 +83,129 @@ msgstr ""
 
 msgid "领任务"
 msgstr ""
+
+msgid "Configuration Demo Task"
+msgstr "配置演示任务"
+
+msgid "Demonstrates every configuration widget for English to Chinese translation."
+msgstr "演示英译中任务的全部配置控件。"
+
+msgid "Drop Down Config"
+msgstr "下拉框配置"
+
+msgid "Boolean Config"
+msgstr "bool配置"
+
+msgid "Integer Config"
+msgstr "整数配置"
+
+msgid "Float Config"
+msgstr "浮点数配置"
+
+msgid "String Config"
+msgstr "字符串配置"
+
+msgid "Text Edit Config"
+msgstr "多行文本配置"
+
+msgid "List Config"
+msgstr "列表配置"
+
+msgid "Drop Down Options Config"
+msgstr "下拉框选项配置"
+
+msgid "Multi Selection Config"
+msgstr "多选配置"
+
+msgid "Sub Boolean Config"
+msgstr "子bool配置"
+
+msgid "Sub String Config"
+msgstr "子字符串配置"
+
+msgid "Sub Float Config"
+msgstr "子浮点数配置"
+
+msgid "Game Hotkey Config"
+msgstr "游戏快捷键配置"
+
+msgid "Button Config"
+msgstr "按钮配置"
+
+msgid "Drop-down configuration with translated option values."
+msgstr "带有已翻译选项值的下拉框配置。"
+
+msgid "Single-line string configuration with a translated value."
+msgstr "带有已翻译值的单行字符串配置。"
+
+msgid "Multi-line string configuration with a translated value."
+msgstr "带有已翻译值的多行字符串配置。"
+
+msgid "Dropdown option list restricted to available translated values."
+msgstr "仅可从已翻译可用值中选择的下拉框选项列表。"
+
+msgid "Open the shared global configuration example."
+msgstr "打开共享的全局配置示例。"
+
+msgid "Button configuration that displays all current values."
+msgstr "显示全部当前配置值的按钮配置。"
+
+msgid "Drop Down Value 1"
+msgstr "下拉框值 1"
+
+msgid "Drop Down Value 2"
+msgstr "下拉框值 2"
+
+msgid "Multi Selection Value 1"
+msgstr "多选值 1"
+
+msgid "Multi Selection Value 2"
+msgstr "多选值 2"
+
+msgid "Multi Selection Value 3"
+msgstr "多选值 3"
+
+msgid "Button Value"
+msgstr "按钮值"
+
+msgid "Configuration values displayed."
+msgstr "已显示配置值。"
+
+msgid "String Value"
+msgstr "字符串值"
+
+msgid "Text Edit Value"
+msgstr "多行文本值"
+
+msgid "List Value 1"
+msgstr "列表值 1"
+
+msgid "List Value 2"
+msgstr "列表值 2"
+
+msgid "Sub String Value"
+msgstr "子字符串值"
+
+msgid "Available Drop Down Value 1"
+msgstr "可用下拉框值 1"
+
+msgid "Available Drop Down Value 2"
+msgstr "可用下拉框值 2"
+
+msgid "Available Drop Down Value 3"
+msgstr "可用下拉框值 3"
+
+msgid "True"
+msgstr "bool值 True"
+
+msgid "False"
+msgstr "bool值 False"
+
+msgid "Select one of the available drop-down values."
+msgstr "请选择可用的下拉框值之一。"
+
+msgid "Select only available multi-selection values."
+msgstr "请只选择可用的多选值。"
+
+msgid "Select only available drop-down option values."
+msgstr "请只选择可用的下拉框选项值。"

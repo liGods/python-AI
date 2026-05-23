@@ -83,3 +83,129 @@ msgstr "Mail"
 
 msgid "领任务"
 msgstr "Claim Missions"
+
+msgid "Configuration Demo Task"
+msgstr ""
+
+msgid "Demonstrates every configuration widget for English to Chinese translation."
+msgstr ""
+
+msgid "Drop Down Config"
+msgstr ""
+
+msgid "Boolean Config"
+msgstr ""
+
+msgid "Integer Config"
+msgstr ""
+
+msgid "Float Config"
+msgstr ""
+
+msgid "String Config"
+msgstr ""
+
+msgid "Text Edit Config"
+msgstr ""
+
+msgid "List Config"
+msgstr ""
+
+msgid "Drop Down Options Config"
+msgstr ""
+
+msgid "Multi Selection Config"
+msgstr ""
+
+msgid "Sub Boolean Config"
+msgstr ""
+
+msgid "Sub String Config"
+msgstr ""
+
+msgid "Sub Float Config"
+msgstr ""
+
+msgid "Game Hotkey Config"
+msgstr ""
+
+msgid "Button Config"
+msgstr ""
+
+msgid "Drop-down configuration with translated option values."
+msgstr ""
+
+msgid "Single-line string configuration with a translated value."
+msgstr ""
+
+msgid "Multi-line string configuration with a translated value."
+msgstr ""
+
+msgid "Dropdown option list restricted to available translated values."
+msgstr ""
+
+msgid "Open the shared global configuration example."
+msgstr ""
+
+msgid "Button configuration that displays all current values."
+msgstr ""
+
+msgid "Drop Down Value 1"
+msgstr ""
+
+msgid "Drop Down Value 2"
+msgstr ""
+
+msgid "Multi Selection Value 1"
+msgstr ""
+
+msgid "Multi Selection Value 2"
+msgstr ""
+
+msgid "Multi Selection Value 3"
+msgstr ""
+
+msgid "Button Value"
+msgstr ""
+
+msgid "Configuration values displayed."
+msgstr ""
+
+msgid "String Value"
+msgstr ""
+
+msgid "Text Edit Value"
+msgstr ""
+
+msgid "List Value 1"
+msgstr ""
+
+msgid "List Value 2"
+msgstr ""
+
+msgid "Sub String Value"
+msgstr ""
+
+msgid "Available Drop Down Value 1"
+msgstr ""
+
+msgid "Available Drop Down Value 2"
+msgstr ""
+
+msgid "Available Drop Down Value 3"
+msgstr ""
+
+msgid "True"
+msgstr ""
+
+msgid "False"
+msgstr ""
+
+msgid "Select one of the available drop-down values."
+msgstr ""
+
+msgid "Select only available multi-selection values."
+msgstr ""
+
+msgid "Select only available drop-down option values."
+msgstr ""

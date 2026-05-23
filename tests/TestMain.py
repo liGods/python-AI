@@ -3,6 +3,9 @@ import unittest
 
 from src.config import config
 from ok.test.TaskTestCase import TaskTestCase
+from ok.gui.tasks.ConfigItemFactory import config_widget
+from ok.gui.tasks.ModifyListDialog import ModifyListDialog
+from ok.gui.tasks.ModifyListItem import ModifyListItem
 
 from src.tasks.MyOneTimeTask import MyOneTimeTask
 
@@ -11,6 +14,92 @@ class TestMyOneTimeTask(TaskTestCase):
     task_class = MyOneTimeTask
 
     config = config
+
+    def test_config_demo_supports_all_widget_types_and_sub_configs(self):
+        defaults = self.task.default_config
+        config_type = self.task.config_type
+
+        self.assertIsInstance(defaults["Boolean Config"], bool)
+        self.assertIsInstance(defaults["Integer Config"], int)
+        self.assertIsInstance(defaults["Float Config"], float)
+        self.assertIsInstance(defaults["String Config"], str)
+        self.assertIsInstance(defaults["List Config"], list)
+        self.assertIsInstance(defaults["Drop Down Options Config"], list)
+        self.assertEqual("String Value", defaults["String Config"])
+        self.assertEqual(["List Value 1", "List Value 2"], defaults["List Config"])
+        self.assertEqual("drop_down", config_type["Drop Down Config"]["type"])
+        self.assertEqual("text_edit", config_type["Text Edit Config"]["type"])
+        self.assertEqual("drop_down", config_type["Drop Down Options Config"]["type"])
+        self.assertEqual(
+            [
+                "Available Drop Down Value 1",
+                "Available Drop Down Value 2",
+                "Available Drop Down Value 3",
+            ],
+            config_type["Drop Down Options Config"]["options_available"],
+        )
+        self.assertEqual("multi_selection", config_type["Multi Selection Config"]["type"])
+        self.assertEqual("global", config_type["Game Hotkey Config"]["type"])
+        self.assertEqual("button", config_type["Button Config"]["type"])
+        self.assertEqual(
+            {
+                "Drop Down Value 1": ["Sub Boolean Config"],
+                "Drop Down Value 2": ["Sub String Config", "Sub Float Config"],
+            },
+            config_type["Drop Down Config"]["sub_configs"],
+        )
+
+    def test_options_available_uses_restricted_option_list_dialog(self):
+        widget = config_widget(
+            self.task.config_type,
+            self.task.config_description,
+            self.task.config,
+            "Drop Down Options Config",
+            self.task.config.get("Drop Down Options Config"),
+            self.task,
+        )
+        self.assertIsInstance(widget, ModifyListItem)
+
+        options = self.task.config_type["Drop Down Options Config"]["options_available"]
+        dialog = ModifyListDialog(["Available Drop Down Value 1"], widget, options_available=options)
+        result = []
+        dialog.list_modified.connect(result.append)
+
+        self.assertEqual(3, dialog.available_list_widget.count())
+        dialog.available_list_widget.setCurrentRow(1)
+        dialog.add_available_item()
+        dialog.confirm()
+
+        self.assertEqual(
+            ["Available Drop Down Value 1", "Available Drop Down Value 2"],
+            result[0],
+        )
+        widget.list_modified(["Available Drop Down Value 1", "Not Available"])
+        self.assertEqual(["Available Drop Down Value 1"], self.task.config["Drop Down Options Config"])
+
+    def test_run_shows_config_values(self):
+        self.task.config.reset_to_default()
+        self.task.run()
+
+        for key, value in self.task.config.items():
+            if key != "Game Hotkey Config":
+                self.assertEqual(self.task.translate_config_value(value), self.task.info_get(key))
+        self.assertEqual(
+            dict(self.task.get_global_config("Game Hotkey Config")),
+            self.task.info_get("Game Hotkey Config"),
+        )
+        self.assertEqual("下拉框值 1", self.task.info_get("Drop Down Config"))
+        self.assertEqual("bool值 True", self.task.info_get("Boolean Config"))
+        self.assertEqual("字符串值", self.task.info_get("String Config"))
+        self.assertEqual(["列表值 1", "列表值 2"], self.task.info_get("List Config"))
+        self.assertEqual(
+            ["可用下拉框值 1"],
+            self.task.info_get("Drop Down Options Config"),
+        )
+        self.assertEqual(
+            ["多选值 1", "多选值 2"],
+            self.task.info_get("Multi Selection Config"),
+        )
 
     def test_ocr1(self):
         # Create a BattleReport object
