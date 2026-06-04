@@ -1,4 +1,8 @@
 ok-script
-onnxocr-ppocrv4==0.0.5
+OpenCC
+adbutils
+onnxocr-ppocrv5
 openvino
 opencv-python
+pynput
+pyside6-fluent-widgets

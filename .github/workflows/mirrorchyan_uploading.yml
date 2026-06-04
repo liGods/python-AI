@@ -17,13 +17,13 @@ jobs:
         with:
           filetype: latest-release
           filename: "ok-script-app-win32-China-setup.exe"
-          mirrorchyan_rid: ok-py
+          mirrorchyan_rid: ok-script-app
           tag: ${{ inputs.tag }}
 
           os: ${{ matrix.os }}
           arch: ${{ matrix.arch }}
 
           owner: ok-oldking
-          repo: ok-py
+          repo: ok-script-app
           github_token: ${{ secrets.GITHUB_TOKEN }}
           upload_token: ${{ secrets.MirrorChyanUploadToken }}
