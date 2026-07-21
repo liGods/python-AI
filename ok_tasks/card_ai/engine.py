@@ -7,13 +7,11 @@ from typing import Any
 
 from ok_tasks.ai_model_adapter import CARD_ORDER
 from ok_tasks.card_ai.heroes import HERO_REGISTRY, normalize_hero_name
+from ok_tasks.card_ai.action_space import UnifiedActionSpace
 from ok_tasks.card_ai.rules import (
     WILDCARD,
-    action_type,
     estimate_route_turns,
-    enumerate_rank_actions,
     rank_key,
-    select_card_ids,
     sorted_ranks,
     validate_card_selection,
 )
@@ -134,32 +132,12 @@ class BaiJiangPaiEngine:
         if self.state.terminal:
             return []
         if self.state.pending_interaction is not None:
-            return self._interaction_actions(self.state.pending_interaction)
+            return UnifiedActionSpace.enumerate_interactions(self.state.pending_interaction)
         actor = actor or self.state.current_player
         if actor != self.state.current_player:
             return []
         player = self.state.players[actor]
-        result: list[LegalAction] = []
-        for ranks in enumerate_rank_actions([card.rank for card in player.hand], self.state.target_ranks):
-            card_ids = select_card_ids(player.hand, ranks)
-            if card_ids is None:
-                continue
-            physical_ranks = tuple(
-                next(card.rank for card in player.hand if card.card_id == card_id)
-                for card_id in card_ids
-            )
-            kind = action_type(ranks)
-            result.append(
-                LegalAction(
-                    action_id=f"play:{actor}:{','.join(card_ids)}:{','.join(ranks)}",
-                    kind="play",
-                    actor=actor,
-                    card_ids=card_ids,
-                    ranks=tuple(ranks),
-                    action_type=kind,
-                    parameters={"physical_ranks": list(physical_ranks)},
-                )
-            )
+        result = UnifiedActionSpace.enumerate_plays(actor, player.hand, self.state.target_ranks)
         if self.state.target_ranks:
             result.append(LegalAction(f"pass:{actor}", "pass", actor))
             if not any(action.kind == "play" for action in result) and self._skill_available(player, "疑城", 3):
@@ -276,35 +254,7 @@ class BaiJiangPaiEngine:
         self._activate_next_interaction(self._next_player(action.actor))
 
     def _interaction_actions(self, pending: dict[str, Any]) -> list[LegalAction]:
-        actor = pending["actor"]
-        skill = pending["skill"]
-        actions = []
-        for index, option in enumerate(pending.get("options", [])):
-            card_ids = tuple(option.get("card_ids", []))
-            ranks = tuple(option.get("ranks", [option["rank"]] if option.get("rank") else []))
-            actions.append(
-                LegalAction(
-                    f"interaction:{actor}:{skill}:{index}",
-                    "interaction",
-                    actor,
-                    card_ids=card_ids,
-                    ranks=ranks,
-                    target=option.get("target"),
-                    skill=skill,
-                    parameters={"option_index": index, **option},
-                )
-            )
-        if pending.get("optional"):
-            actions.append(
-                LegalAction(
-                    f"interaction:{actor}:{skill}:skip",
-                    "interaction",
-                    actor,
-                    skill=skill,
-                    parameters={"skip": True},
-                )
-            )
-        return actions
+        return UnifiedActionSpace.enumerate_interactions(pending)
 
     def _resolve_interaction(self, action: LegalAction, events: list[dict[str, Any]]) -> None:
         pending = self.state.pending_interaction

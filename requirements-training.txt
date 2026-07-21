@@ -1,7 +1,0 @@
-# WSL2/Linux only. Install the matching CUDA build of PyTorch from pytorch.org first.
-torch>=2.6
-onnx>=1.17
-onnxscript>=0.2
-openvino>=2025.0
-onnxruntime-gpu==1.22.0
-numpy>=2.0
