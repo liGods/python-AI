@@ -7,6 +7,7 @@ from typing import Any
 
 from .candidate import CandidateDecision
 from .context import DecisionContext
+from .landlord_strategy import select_landlord_candidate
 
 
 def select_soft_candidate(
@@ -33,7 +34,7 @@ def select_soft_candidate(
     teammate_count = context.teammate_count
     nearest_enemy = context.nearest_enemy
 
-    if not target and not urgent and not winning:
+    if not target and not urgent and not winning and context.position != "landlord":
         preliminary = min(candidates, key=lambda candidate: candidate.score)
         if preliminary.action_type == "solo" and preliminary.uses_control:
             ordinary = [
@@ -92,15 +93,14 @@ def select_soft_candidate(
     if target and context.protect_teammate_play and not winning and teammate_takeover is None:
         return None
 
-    if target and context.position == "landlord" and not urgent:
-        economical = [
-            candidate for candidate in candidates
-            if not is_bomb(candidate.effective_action) and not candidate.uses_control
-        ]
-        if economical:
-            return min(economical, key=lambda candidate: candidate.score)
-
-    best = teammate_takeover or min(candidates, key=lambda candidate: candidate.score)
+    landlord_best = select_landlord_candidate(
+        context,
+        candidates,
+        is_bomb=is_bomb,
+        rank_index=rank_index,
+        baseline_turns=baseline_turns(),
+    )
+    best = teammate_takeover or landlord_best or min(candidates, key=lambda candidate: candidate.score)
     farmer_route_press: CandidateDecision | None = None
     if target and context.position != "landlord" and not context.protect_teammate_play and not winning:
         current_turns = baseline_turns()
