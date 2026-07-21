@@ -3,13 +3,11 @@ from __future__ import annotations
 from collections import Counter
 from itertools import product
 
-from ok_tasks.RlCardRuleModel import (
-    _action_type,
-    _legal_actions,
-    _post_skill_route_turns,
-    _to_internal,
-    _to_rlcard,
-)
+from ok_tasks.RlCardRuleModel import _post_skill_route_turns
+from ok_tasks.card_ai.rlcard_adapter import action_type as _action_type
+from ok_tasks.card_ai.rlcard_adapter import legal_actions as _legal_actions
+from ok_tasks.card_ai.rlcard_adapter import to_internal as _to_internal
+from ok_tasks.card_ai.rlcard_adapter import to_rlcard as _to_rlcard
 from ok_tasks.ai_model_adapter import CARD_ORDER
 from ok_tasks.card_ai.schema import CardInstance
 
