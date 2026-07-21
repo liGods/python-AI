@@ -17,6 +17,7 @@ class CandidateDecision:
     hero_skill_evaluation: Mapping[str, Any] | None
     table_pressure: Mapping[str, Any]
     tactical_utility: Mapping[str, Any]
+    game_stage: str = "midgame"
 
     def __post_init__(self) -> None:
         """Freeze nested score payloads as well as the dataclass fields."""
@@ -37,6 +38,7 @@ class CandidateDecision:
             hero_skill_evaluation=record.get("hero_skill_evaluation"),
             table_pressure=dict(record.get("table_pressure", {})),
             tactical_utility=dict(record.get("tactical_utility", {})),
+            game_stage=str(record.get("game_stage", "midgame")),
         )
 
     @property

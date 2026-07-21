@@ -16,6 +16,7 @@ from ok_tasks.card_ai.rlcard_adapter import (
     to_rlcard as _adapter_to_rlcard,
 )
 from ok_tasks.card_ai.decision.candidate import CandidateDecision
+from ok_tasks.card_ai.decision.stage import StageContext, classify_game_stage, stage_score_components
 from ok_tasks.card_ai.decision.context import DecisionContext
 from ok_tasks.card_ai.decision.explanation import structured_score
 from ok_tasks.card_ai.decision.hard_rules import select_hard_rule
@@ -574,12 +575,53 @@ def _bounded_projection_log(projection, detail_limit=_MAX_LOGGED_RANDOM_BRANCHES
     return value
 
 
+def _stage_context(hand, target, enemy_counts, pressure_context, hero_context):
+    """Build a stage context from public state already visible to this player."""
+
+    pressure = pressure_context if isinstance(pressure_context, dict) else {}
+    seen = [rank for event in hero_context.history for rank in event.get("ranks", ())]
+    seen.extend(target)
+    counts = Counter(seen)
+    nearest_enemy = min(enemy_counts or [17, 17])
+    return StageContext(
+        own_card_count=len(hand),
+        position=str(pressure.get("position", "landlord_down")),
+        enemy_card_counts=tuple(int(count) for count in enemy_counts or ()),
+        teammate_card_count=pressure.get("teammate_count") if isinstance(pressure.get("teammate_count"), int) else None,
+        table_has_cards=bool(target),
+        table_is_teammate=bool(pressure.get("table_is_teammate", False)),
+        seen_bombs=sum(count >= 4 for rank, count in counts.items() if rank not in {"B", "R", "X", "D"}),
+        seen_jokers=sum(counts[rank] for rank in ("B", "R", "X", "D")),
+        seen_twos=counts["2"],
+        one_turn_finish_risk=nearest_enemy <= 1 or (bool(target) and nearest_enemy == len(target)),
+    )
+
+
+def _score_action_with_stage(
+    hand, action, urgent, hero=None, last_action_type=None, policy_id="balanced", target="",
+    enemy_counts=None, hero_state=None, pressure_context=None, skill_projection=None,
+    hero_context=None, physical_action=None, action_type=None, game_stage=None,
+):
+    """Append public-stage refinements after all existing legacy score fields."""
+
+    legacy_score = _score_action(
+        hand, action, urgent, hero, last_action_type, policy_id, target, enemy_counts,
+        hero_state, pressure_context, skill_projection, hero_context, physical_action,
+        action_type,
+    )
+    context = hero_context or _context_for_score(hand, target, hero, hero_state, enemy_counts, pressure_context)
+    stage = game_stage or classify_game_stage(_stage_context(hand, target, enemy_counts, pressure_context, context))
+    projection = skill_projection or _evaluate_hero_play(context, _to_internal(physical_action or action), _projection_route_evaluator(hand))
+    return legacy_score[:-1] + stage_score_components(stage, action_type or _action_type(action), action, projection) + legacy_score[-1:]
+
+
 def _build_candidate_records(hand, target, enemy_counts, hero=None, last_action_type=None, policy_id="balanced", hero_state=None, pressure_context=None, decision_context=None):  # 一次构建候选、英雄投影和评分，供解释与最终选牌共同消费。
     hero_state = hero_state if isinstance(hero_state, dict) else {}
     pressure_context = pressure_context if isinstance(pressure_context, dict) else {}
     position = pressure_context.get("position", "landlord_down")
     urgent = min(enemy_counts or [17, 17]) <= (3 if position == "landlord" else 5)
     context = decision_context or _context_for_score(hand, target, hero, hero_state, enemy_counts, pressure_context)
+    game_stage = classify_game_stage(_stage_context(hand, target, enemy_counts, pressure_context, context))
     route_evaluator = _projection_route_evaluator(hand)
     projection_cache = {}
     records_by_physical = {}
@@ -598,7 +640,7 @@ def _build_candidate_records(hand, target, enemy_counts, hero=None, last_action_
             projection_cache[projection_key] = projection
         if not projection.legal:
             continue
-        score = _score_action(
+        score = _score_action_with_stage(
             hand,
             effective_action,
             urgent,
@@ -613,6 +655,7 @@ def _build_candidate_records(hand, target, enemy_counts, hero=None, last_action_
             context,
             physical_action=physical_action,
             action_type=exact_action_type,
+            game_stage=game_stage,
         )
         skill_evaluation = evaluate_guan_yinping_action(hand, physical_action, hero_state) if hero == "关银屏" else evaluate_zhao_yun_action(hand, effective_action, hero_state, pressure_context) if hero == "赵云" else None
         record = CandidateDecision(
@@ -624,6 +667,7 @@ def _build_candidate_records(hand, target, enemy_counts, hero=None, last_action_
             hero_skill_evaluation=skill_evaluation,
             table_pressure=evaluate_table_pressure(effective_action, pressure_context),
             tactical_utility=evaluate_tactical_utility(hand, effective_action, target, pressure_context),
+            game_stage=game_stage.value,
         )
         previous = records_by_physical.get(physical_action)
         if previous is None or (record.score, _adapter_action_order(effective_action), effective_action) < (previous.score, _adapter_action_order(previous.effective_action), previous.effective_action):
@@ -642,6 +686,7 @@ def _serialise_candidate(record):  # 将内部投影对象转换成保持旧字�
         "physical_action": physical_action,
         "action": effective_action,
         "action_type": record.action_type,
+        "game_stage": record.game_stage,
         "score": list(record.score[:-1]),
         "score_components": structured_score(record, _SCORE_REASON_LABELS),
         "is_bomb": _is_bomb_action(effective_action),

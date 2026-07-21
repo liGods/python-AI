@@ -15,4 +15,5 @@ def structured_score(candidate: CandidateDecision, labels: tuple[str, ...]) -> d
         "projection": projection_features(candidate),
         "table_pressure": dict(candidate.table_pressure),
         "tactical_utility": dict(candidate.tactical_utility),
+        "game_stage": candidate.game_stage,
     }

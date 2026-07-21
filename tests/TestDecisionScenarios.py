@@ -62,6 +62,8 @@ class TestDecisionScenarios(unittest.TestCase):
                     self.assertIn("score", candidate, f"缺少旧评分字段: {details}")
                     self.assertIn("score_components", candidate, f"缺少结构化评分字段: {details}")
                     self.assertIn("components", candidate["score_components"], f"评分分项不完整: {details}")
+                    self.assertIn(candidate.get("game_stage"), {"opening", "midgame", "endgame", "emergency"}, f"缺少局面阶段: {details}")
+                    self.assertIn("stage_emergency_block", candidate["score_components"]["components"], f"缺少阶段评分分项: {details}")
 
 
 if __name__ == "__main__":
