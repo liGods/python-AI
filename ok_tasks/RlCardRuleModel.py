@@ -15,6 +15,11 @@ from ok_tasks.card_ai.rlcard_adapter import (
     to_internal as _adapter_to_internal,
     to_rlcard as _adapter_to_rlcard,
 )
+from ok_tasks.card_ai.decision.candidate import CandidateDecision
+from ok_tasks.card_ai.decision.context import DecisionContext
+from ok_tasks.card_ai.decision.explanation import structured_score
+from ok_tasks.card_ai.decision.hard_rules import select_hard_rule
+from ok_tasks.card_ai.decision.scoring import select_soft_candidate
 from ok_tasks.PolicyOptimizer import POLICY_PROFILES  # 导入经过边界限制的三套策略配置。
 
 _WILDCARD = "W"
@@ -610,43 +615,44 @@ def _build_candidate_records(hand, target, enemy_counts, hero=None, last_action_
             action_type=exact_action_type,
         )
         skill_evaluation = evaluate_guan_yinping_action(hand, physical_action, hero_state) if hero == "关银屏" else evaluate_zhao_yun_action(hand, effective_action, hero_state, pressure_context) if hero == "赵云" else None
-        record = {
-            "action": effective_action,
-            "physical_action": physical_action,
-            "action_type": exact_action_type,
-            "projection": projection,
-            "score": score,
-            "hero_skill_evaluation": skill_evaluation,
-            "table_pressure": evaluate_table_pressure(effective_action, pressure_context),
-            "tactical_utility": evaluate_tactical_utility(hand, effective_action, target, pressure_context),
-        }
+        record = CandidateDecision(
+            effective_action=effective_action,
+            physical_action=physical_action,
+            action_type=exact_action_type,
+            projection=projection,
+            score=score,
+            hero_skill_evaluation=skill_evaluation,
+            table_pressure=evaluate_table_pressure(effective_action, pressure_context),
+            tactical_utility=evaluate_tactical_utility(hand, effective_action, target, pressure_context),
+        )
         previous = records_by_physical.get(physical_action)
-        if previous is None or (record["score"], _adapter_action_order(effective_action), effective_action) < (previous["score"], _adapter_action_order(previous["action"]), previous["action"]):
+        if previous is None or (record.score, _adapter_action_order(effective_action), effective_action) < (previous.score, _adapter_action_order(previous.effective_action), previous.effective_action):
             records_by_physical[physical_action] = record  # 同一实体点击动作只保留评分最优的万能牌生效解释。
     return tuple(records_by_physical.values()), projection_cache, route_evaluator
 
 
 def _serialise_candidate(record):  # 将内部投影对象转换成保持旧字段兼容的有界日志对象。
-    projection = record["projection"]
-    effective_action = record["action"]
-    physical_action = record["physical_action"]
+    projection = record.projection
+    effective_action = record.effective_action
+    physical_action = record.physical_action
     return {
         "cards": _to_internal(physical_action),
         "physical_cards": _to_internal(physical_action),
         "effective_cards": _to_internal(effective_action),
         "physical_action": physical_action,
         "action": effective_action,
-        "action_type": record["action_type"],
-        "score": list(record["score"][:-1]),
+        "action_type": record.action_type,
+        "score": list(record.score[:-1]),
+        "score_components": structured_score(record, _SCORE_REASON_LABELS),
         "is_bomb": _is_bomb_action(effective_action),
         "remaining_turns": projection.expected_remaining_turns,
         "worst_remaining_turns": projection.worst_remaining_turns,
         "opponent_finish_risk": projection.enemy_finish_risk,
-        "hero_skill_evaluation": record["hero_skill_evaluation"],
+        "hero_skill_evaluation": dict(record.hero_skill_evaluation) if record.hero_skill_evaluation is not None else None,
         "skill_projection": _bounded_projection_log(projection),
         "triggered_rule_ids": list(projection.triggered_rules),
-        "table_pressure": record["table_pressure"],
-        "tactical_utility": record["tactical_utility"],
+        "table_pressure": dict(record.table_pressure),
+        "tactical_utility": dict(record.tactical_utility),
     }
 
 
@@ -663,7 +669,7 @@ def enumerate_action_candidates(state, decision_context=None, candidate_records=
     return [_serialise_candidate(record) for record in records]  # 日志序列化不再触发第二次英雄技能投影。
 
 
-def _choose_action(hand, target, enemy_counts, hero=None, last_action_type=None, policy_id="balanced", protect_teammate_play=False, hero_state=None, pressure_context=None, decision_context=None, candidate_records=None, projection_cache=None, route_evaluator=None):  # 直接消费候选缓存，避免日志与选择阶段重复执行英雄投影。
+def _choose_action_legacy(hand, target, enemy_counts, hero=None, last_action_type=None, policy_id="balanced", protect_teammate_play=False, hero_state=None, pressure_context=None, decision_context=None, candidate_records=None, projection_cache=None, route_evaluator=None):  # 旧选择器保留到本次重构验证完成。
     context = decision_context or _context_for_score(hand, target, hero, hero_state, enemy_counts, pressure_context)
     records = candidate_records
     if records is None:
@@ -793,6 +799,59 @@ def _choose_action(hand, target, enemy_counts, hero=None, last_action_type=None,
     return best_record["physical_action"]  # 最终只返回真实可点击实体，生效动作仅保留在候选解释中。
 
 
+def _choose_action(hand, target, enemy_counts, hero=None, last_action_type=None, policy_id="balanced", protect_teammate_play=False, hero_state=None, pressure_context=None, decision_context=None, candidate_records=None, projection_cache=None, route_evaluator=None):
+    """Select one physical action through immutable candidates and soft scoring."""
+
+    hero_state = hero_state if isinstance(hero_state, dict) else {}
+    pressure_context = pressure_context if isinstance(pressure_context, dict) else {}
+    hero_context = decision_context or _context_for_score(hand, target, hero, hero_state, enemy_counts, pressure_context)
+    records = candidate_records
+    if records is None:
+        records, built_cache, built_route_evaluator = _build_candidate_records(
+            hand, target, enemy_counts, hero, last_action_type, policy_id, hero_state, pressure_context, hero_context
+        )
+        projection_cache = built_cache if projection_cache is None else projection_cache
+        route_evaluator = built_route_evaluator if route_evaluator is None else route_evaluator
+    selection_context = DecisionContext(
+        hand=hand,
+        target=target,
+        enemy_counts=tuple(enemy_counts or (17, 17)),
+        hero=hero,
+        last_action_type=last_action_type,
+        policy_id=policy_id,
+        protect_teammate_play=protect_teammate_play,
+        hero_state=hero_state,
+        pressure=pressure_context,
+        hero_context=hero_context,
+    )
+    hard_decision = select_hard_rule(selection_context, records)
+    if hard_decision is not None:
+        return hard_decision.candidate.physical_action if hard_decision.candidate is not None else ""
+    projection_cache = projection_cache if projection_cache is not None else {}
+    route_evaluator = route_evaluator or _projection_route_evaluator(hand)
+
+    def baseline_turns() -> int:
+        return _post_skill_route_turns(tuple(_to_internal(hand)))
+
+    def project_pass():
+        pass_key = ("pass", "", "none")
+        projection = projection_cache.get(pass_key)
+        if projection is None:
+            projection = _evaluate_hero_play(hero_context, "pass", route_evaluator)
+            projection_cache[pass_key] = projection
+        return projection
+
+    selected = select_soft_candidate(
+        selection_context,
+        records,
+        is_bomb=_is_bomb_action,
+        rank_index=lambda card: INDEX.get(card, len(INDEX)),
+        baseline_turns=baseline_turns,
+        pass_projection=project_pass,
+    )
+    return selected.physical_action if selected is not None else ""
+
+
 def load_model(weights_path):  # 创建无需外部权重的 RLCard 官方规则模型。
     return {"engine": "rlcard-action-space-v3", "last_decision": None}  # 返回可保存最近候选解释的轻量模型对象。
 
@@ -886,12 +945,12 @@ def predict(model, state):  # 根据屏幕识别状态选择一手合法且尽�
         projection_cache=projection_cache,
         route_evaluator=route_evaluator,
     )  # 选择阶段返回真实可点击实体牌，牌型与技能触发仍使用缓存中的生效动作。
-    chosen_record = next((record for record in candidate_records if record["physical_action"] == action), None)
+    chosen_record = next((record for record in candidate_records if record.physical_action == action), None)
     if isinstance(model, dict):  # 规则模型字典允许保存本次可解释决策。
         farmer_pressed_landlord = bool(target and action and state.get("position", "landlord_down") != "landlord" and not protect_teammate_play)  # 标记农民本回合确实使用合法牌压制地主。
         if chosen_record is not None:
-            chosen_projection = _bounded_projection_log(chosen_record["projection"])
-            effective_action = chosen_record["action"]
+            chosen_projection = _bounded_projection_log(chosen_record.projection)
+            effective_action = chosen_record.effective_action
         else:
             pass_key = ("pass", "", "none")
             pass_projection = projection_cache.get(pass_key)

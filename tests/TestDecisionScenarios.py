@@ -38,6 +38,7 @@ class TestDecisionScenarios(unittest.TestCase):
                 first_model = load_model("")
                 first = tuple(predict(first_model, scenario.state))
                 second = tuple(predict(load_model(""), scenario.state))
+                decision = first_model["last_decision"]
                 details = json.dumps(
                     {
                         "state": scenario.state,
@@ -56,6 +57,11 @@ class TestDecisionScenarios(unittest.TestCase):
                 if scenario.allowed_actions:
                     self.assertIn(first, scenario.allowed_actions, f"不在允许动作中: {details}")
                 self.assertEqual(first, scenario.recommended_action, f"推荐动作不匹配: {details}")
+                self.assertTrue(decision["candidates"], f"候选日志为空: {details}")
+                for candidate in decision["candidates"]:
+                    self.assertIn("score", candidate, f"缺少旧评分字段: {details}")
+                    self.assertIn("score_components", candidate, f"缺少结构化评分字段: {details}")
+                    self.assertIn("components", candidate["score_components"], f"评分分项不完整: {details}")
 
 
 if __name__ == "__main__":
