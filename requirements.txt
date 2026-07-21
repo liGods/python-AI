@@ -24,6 +24,7 @@ numpy==2.4.6
     # via
     #   opencv-python
     #   openvino
+    #   rlcard
     #   shapely
 ok-script==1.0.154
     # via -r requirements.in
@@ -81,6 +82,8 @@ requests==2.34.2
     #   ok-script
 retry2==0.9.5
     # via adbutils
+rlcard==1.2.0
+    # via -r requirements.in
 shapely==2.1.2
     # via onnxocr-ppocrv5
 shiboken6==6.11.1
@@ -90,6 +93,8 @@ shiboken6==6.11.1
     #   pyside6-essentials
 six==1.17.0
     # via pynput
+termcolor==3.3.0
+    # via rlcard
 typing-extensions==4.15.0
     # via ok-script
 urllib3==2.7.0

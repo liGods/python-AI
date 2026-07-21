@@ -6,3 +6,4 @@ openvino
 opencv-python
 pynput
 pyside6-fluent-widgets
+rlcard==1.2.0

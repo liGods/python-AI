@@ -66,7 +66,7 @@ config = {
         }
     },
     'windows': {  # Windows游戏请填写此设置
-        #'exe': ['StarRail.exe'],
+        'exe': ['三国：百将牌.exe'],
         # optional, if set, will search the exe only
         # 'hwnd_class': 'UnrealWindow', #增加重名检查准确度
         'interaction': ['Pynput', 'PostMessage', 'Genshin', 'PyDirect','ForegroundPostMessage'], # Genshin:某些操作可以后台, 部分游戏支持 PostMessage:可后台点击, 极少游戏支持 ForegroundPostMessage:前台使用PostMessage Pynput/PyDirect:仅支持前台使用
