@@ -31,6 +31,36 @@ def to_internal(action: str) -> list[str]:
     return [RLCARD_TO_INTERNAL.get(card, card) for card in action]
 
 
+def action_order(action: str) -> int:
+    """Return the stable RLCard action-space order used for deterministic ties."""
+
+    return _ACTION_ORDER.get(action, len(_ACTION_ORDER))
+
+
+def physical_action(hand: str, effective_action: str) -> str:
+    """Map an effective action back to the physical ranks that must be clicked."""
+
+    remaining_natural = Counter(card for card in hand if card != WILDCARD)
+    physical: list[str] = []
+    wildcard_count = hand.count(WILDCARD)
+    for rank in effective_action:
+        if remaining_natural[rank] > 0:
+            remaining_natural[rank] -= 1
+            physical.append(rank)
+        elif wildcard_count > 0:
+            wildcard_count -= 1
+            physical.append(WILDCARD)
+        else:
+            raise ValueError(f"Effective action cannot be mapped to physical hand: {effective_action}")
+    return to_rlcard(physical)
+
+
+def legal_action_variants(hand: str, target: str = "") -> tuple[tuple[str, str], ...]:
+    """Return each effective legal action together with its physical-card mapping."""
+
+    return tuple((action, physical_action(hand, action)) for action in legal_actions(hand, target))
+
+
 def action_type(action: str) -> str:
     """Normalize RLCard's detailed action names to the project's stable types."""
 
@@ -56,16 +86,22 @@ def _contains_with_wildcards(hand: str, action: str) -> bool:
     return missing <= hand.count(WILDCARD)
 
 
-def _is_five_bomb(action: str) -> bool:
+def contains_with_wildcards(hand: str, action: str) -> bool:
+    """Return whether an effective action can be made from a wildcard hand."""
+
+    return _contains_with_wildcards(hand, action)
+
+
+def is_five_bomb(action: str) -> bool:
     return len(action) == 5 and len(set(action)) == 1
 
 
 def action_beats(candidate: str, target: str) -> bool:
     """Compare two effective rank actions, including the project's five-bomb rule."""
 
-    if _is_five_bomb(candidate):
-        return not _is_five_bomb(target) or INDEX[candidate[0]] > INDEX[target[0]]
-    if _is_five_bomb(target):
+    if is_five_bomb(candidate):
+        return not is_five_bomb(target) or INDEX[candidate[0]] > INDEX[target[0]]
+    if is_five_bomb(target):
         return False
     for candidate_type, candidate_weight in CARD_TYPE[0].get(candidate, []):
         for target_type, target_weight in CARD_TYPE[0].get(target, []):

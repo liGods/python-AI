@@ -2,7 +2,12 @@ import unittest
 
 from ok_tasks.card_ai.action_space import UnifiedActionSpace
 from ok_tasks.card_ai.engine import BaiJiangPaiEngine
-from ok_tasks.card_ai.rlcard_adapter import legal_actions, to_rlcard
+from ok_tasks.card_ai.rlcard_adapter import (
+    action_beats,
+    legal_action_variants,
+    legal_actions,
+    to_rlcard,
+)
 from ok_tasks.card_ai.schema import CardInstance, FullGameState, POSITIONS, PlayerState
 
 
@@ -36,10 +41,31 @@ class TestSimulatorCore(unittest.TestCase):
         )
 
     def test_rule_model_and_engine_share_standard_actions(self):
-        from ok_tasks.RlCardRuleModel import _legal_actions
+        from ok_tasks.RlCardRuleModel import _legal_actions, _physical_action
 
         hand = ["3", "3", "4", "4", "5", "5", "9"]
         self.assertEqual(_legal_actions(to_rlcard(hand)), legal_actions(to_rlcard(hand)))
+        self.assertEqual("5W", _physical_action("5W9", "55"))
+
+    def test_wildcard_variants_keep_effective_and_physical_cards_distinct(self):
+        variants = dict(legal_action_variants("5W9"))
+
+        self.assertIn("55", variants)
+        self.assertEqual("5W", variants["55"])
+        self.assertEqual("W", variants["2"])
+
+    def test_five_bomb_is_the_only_response_that_beats_rocket(self):
+        self.assertTrue(action_beats("55555", "BR"))
+        self.assertFalse(action_beats("44444", "55555"))
+        self.assertTrue(action_beats("66666", "55555"))
+
+    def test_action_enumeration_is_stable_for_permuted_hands(self):
+        first = to_rlcard(["W", "5", "5", "3", "3", "3", "3", "3"])
+        second = to_rlcard(["3", "5", "3", "W", "3", "5", "3", "3"])
+
+        self.assertEqual(first, second)
+        self.assertEqual(legal_actions(first), legal_actions(second))
+        self.assertIn("33333", legal_actions(first))
 
 
 if __name__ == "__main__":
