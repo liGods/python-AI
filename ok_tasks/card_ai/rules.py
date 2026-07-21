@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections import Counter
 from itertools import product
 
-from ok_tasks.RlCardRuleModel import _post_skill_route_turns
 from ok_tasks.card_ai.rlcard_adapter import action_type as _action_type
 from ok_tasks.card_ai.rlcard_adapter import legal_actions as _legal_actions
 from ok_tasks.card_ai.rlcard_adapter import to_internal as _to_internal
@@ -32,6 +31,10 @@ def action_type(ranks: list[str] | tuple[str, ...]) -> str:
 
 
 def estimate_route_turns(ranks: tuple[str, ...]) -> int:
+    # Delayed import keeps the rule primitives usable while the live adapter is
+    # importing its public decision core.
+    from ok_tasks.RlCardRuleModel import _post_skill_route_turns
+
     return _post_skill_route_turns(tuple(ranks))
 
 
