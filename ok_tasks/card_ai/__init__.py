@@ -1,4 +1,4 @@
-"""Deterministic BaiJiangPai simulation, training, and deployment interfaces."""
+"""Deterministic BaiJiangPai simulation and rule-policy interfaces."""
 
 from ok_tasks.card_ai.engine import BaiJiangPaiEngine, SimulationError
 from ok_tasks.card_ai.hero_policy import (
