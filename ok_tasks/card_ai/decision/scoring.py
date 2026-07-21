@@ -8,6 +8,8 @@ from typing import Any
 from .candidate import CandidateDecision
 from .context import DecisionContext
 from .landlord_strategy import select_landlord_candidate
+from .farmer_strategy import select_farmer_candidate
+from .team_strategy import _NO_TEAM_DECISION, select_team_candidate
 
 
 def select_soft_candidate(
@@ -33,6 +35,18 @@ def select_soft_candidate(
     teammate_takeover: CandidateDecision | None = None
     teammate_count = context.teammate_count
     nearest_enemy = context.nearest_enemy
+
+    if context.position != "landlord":
+        if context.protect_teammate_play or context.teammate_count in {1, 2}:
+            team_choice = select_team_candidate(context, candidates, rank_index=rank_index)
+            if team_choice is not _NO_TEAM_DECISION:
+                return team_choice
+        if target and urgent and not context.protect_teammate_play:
+            farmer_choice = select_farmer_candidate(
+                context, candidates, is_bomb=is_bomb, rank_index=rank_index, baseline_turns=baseline_turns()
+            )
+            if farmer_choice is not None:
+                return farmer_choice
 
     if not target and not urgent and not winning and context.position != "landlord":
         preliminary = min(candidates, key=lambda candidate: candidate.score)
