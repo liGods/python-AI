@@ -16,6 +16,7 @@ from ok_tasks.card_ai.rlcard_adapter import (
     to_rlcard as _adapter_to_rlcard,
 )
 from ok_tasks.card_ai.decision.candidate import CandidateDecision
+from ok_tasks.card_ai.search.endgame import search_public_endgame
 from ok_tasks.card_ai.decision.stage import StageContext, classify_game_stage, stage_score_components
 from ok_tasks.card_ai.decision.context import DecisionContext
 from ok_tasks.card_ai.decision.explanation import structured_score
@@ -894,7 +895,12 @@ def _choose_action(hand, target, enemy_counts, hero=None, last_action_type=None,
         baseline_turns=baseline_turns,
         pass_projection=project_pass,
     )
-    return selected.physical_action if selected is not None else ""
+    if selected is None:
+        _choose_action.last_search_result = None
+        return ""
+    result = search_public_endgame(selection_context, records, selected)
+    _choose_action.last_search_result = result
+    return result.candidate.physical_action
 
 
 def load_model(weights_path):  # 创建无需外部权重的 RLCard 官方规则模型。
