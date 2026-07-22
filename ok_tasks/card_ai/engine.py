@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import random
 from collections import Counter
+from itertools import combinations
 from typing import Any
 
 from ok_tasks.ai_model_adapter import CARD_ORDER
@@ -308,7 +309,7 @@ class BaiJiangPaiEngine:
                     self._discard_ids(player, (card_id,), "卢植:儒宗", events)
                 self._use_skill(player, "儒宗")
             elif effect == "ganglie":
-                self._discard_lowest(player, min(3, len(player.hand)), "夏侯惇:刚烈", events)
+                self._discard_ids(player, tuple(action.card_ids), "夏侯惇:刚烈", events)
                 self._gain_rank(player, action.parameters["rank"], "夏侯惇:刚烈", events)
                 self._use_skill(player, "刚烈")
             elif effect == "take_cards":
@@ -438,12 +439,28 @@ class BaiJiangPaiEngine:
         hero = owner.hero
         if hero == "夏侯惇" and previous.get("was_largest") and self._skill_available(owner, "刚烈", 1) and len(owner.hand) >= 3:
             highest = max(previous["ranks"], key=rank_key)
+            options = []
+            seen_ranks = set()
+            for selected in combinations(owner.hand, 3):
+                discard_ranks = tuple(card.rank for card in selected)
+                if discard_ranks in seen_ranks:
+                    continue
+                seen_ranks.add(discard_ranks)
+                options.append(
+                    {
+                        "rank": highest,
+                        "ranks": [highest],
+                        "card_ids": [card.card_id for card in selected],
+                        "discard_ranks": list(discard_ranks),
+                        "recover_rank": highest,
+                    }
+                )
             self._queue_interaction(
                 {
                     "actor": owner.position,
                     "skill": "刚烈",
                     "effect": "ganglie",
-                    "options": [{"rank": highest}],
+                    "options": options,
                     "optional": True,
                 }
             )

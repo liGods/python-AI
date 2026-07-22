@@ -22,6 +22,7 @@ from ok_tasks.card_ai.heroes import (
     HERO_REGISTRY,
     OWNED_HEROES,
     T0_HEROES,
+    T1_HEROES,
     POLICY_SIMULATED_HEROES,
     SIMULATED_HEROES,
 )
@@ -51,6 +52,7 @@ __all__ = [
     "LegalAction",
     "OWNED_HEROES",
     "T0_HEROES",
+    "T1_HEROES",
     "Observation",
     "PlayerState",
     "POLICY_SIMULATED_HEROES",

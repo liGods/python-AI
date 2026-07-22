@@ -823,7 +823,12 @@ def enumerate_skill_choices(
                 )
     elif profile.choice_kind == "cards":
         max_cards = min(3, len(context.hand))
-        if spec.effect in {"discard_one", "take_one_beaten_card", "take_one_from_straight"}:
+        if spec.effect in {
+            "copy_one_and_reset_on_mixed_large_play",
+            "discard_one",
+            "take_one_beaten_card",
+            "take_one_from_straight",
+        }:
             sizes = (1,)
         elif spec.effect in {"discard_three_recover_highest", "discard_sum_twelve_gain_above_q"}:
             sizes = (3,)
@@ -850,7 +855,9 @@ def enumerate_skill_choices(
         else:
             targets = context.enemies + context.allies
         card_sizes: tuple[int, ...] = ()
-        if spec.effect in {"discard_two_largest_transfer_lead", "give_up_to_two"}:
+        if spec.effect == "discard_two_largest_transfer_lead":
+            card_sizes = (2,) if len(context.hand) >= 2 else ()
+        elif spec.effect == "give_up_to_two":
             card_sizes = tuple(size for size in (1, 2) if size <= len(context.hand))
         elif spec.effect in {"exchange_low_for_largest_non_joker", "give_high_card"}:
             card_sizes = (1,) if context.hand else ()
@@ -860,7 +867,19 @@ def enumerate_skill_choices(
                 choices.append(_choice(spec, "player", len(choices), target=target, parameters={"target": target}))
                 continue
             for size in card_sizes:
-                for indexes in combinations(range(len(context.hand)), size):
+                if spec.effect == "discard_two_largest_transfer_lead":
+                    indexes_options = (
+                        tuple(
+                            sorted(
+                                range(len(context.hand)),
+                                key=lambda index: (RANK_INDEX.get(context.hand[index], -1), index),
+                                reverse=True,
+                            )[:2]
+                        ),
+                    )
+                else:
+                    indexes_options = combinations(range(len(context.hand)), size)
+                for indexes in indexes_options:
                     ranks = tuple(context.hand[index] for index in indexes)
                     choices.append(
                         _choice(
