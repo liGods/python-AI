@@ -66,4 +66,5 @@ def skill_utility_features(candidate: CandidateDecision) -> dict[str, Any]:
         "target_relation_cost": projection.target_relation_cost,
         "resource_changes": dict(projection.resource_changes),
         "random_branch_count": len(projection.random_branches),
+        "hand_expansion": dict(candidate.hand_expansion),
     }

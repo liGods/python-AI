@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Mapping
 
@@ -18,6 +18,7 @@ class CandidateDecision:
     table_pressure: Mapping[str, Any]
     tactical_utility: Mapping[str, Any]
     game_stage: str = "midgame"
+    hand_expansion: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Freeze nested score payloads as well as the dataclass fields."""
@@ -26,6 +27,7 @@ class CandidateDecision:
             object.__setattr__(self, "hero_skill_evaluation", MappingProxyType(dict(self.hero_skill_evaluation)))
         object.__setattr__(self, "table_pressure", MappingProxyType(dict(self.table_pressure)))
         object.__setattr__(self, "tactical_utility", MappingProxyType(dict(self.tactical_utility)))
+        object.__setattr__(self, "hand_expansion", MappingProxyType(dict(self.hand_expansion)))
 
     @classmethod
     def from_record(cls, record: Mapping[str, Any]) -> "CandidateDecision":
@@ -39,6 +41,7 @@ class CandidateDecision:
             table_pressure=dict(record.get("table_pressure", {})),
             tactical_utility=dict(record.get("tactical_utility", {})),
             game_stage=str(record.get("game_stage", "midgame")),
+            hand_expansion=dict(record.get("hand_expansion", {})),
         )
 
     @property
