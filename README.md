@@ -93,7 +93,19 @@ deploy.txt             发布时同步到更新仓库的文件列表
 v*.*.*
 ```
 
-构建流程会根据 `pyappify.yml` 打包应用，并按 `deploy.txt` 同步更新仓库需要的文件。
+构建流程会根据 `pyappify.yml` 打包应用，并按 `deploy.txt` 将增量文件同步到
+[`liGods/python-AI-update`](https://github.com/liGods/python-AI-update)。首次安装使用 Release 中的
+`python-AI-win32-Global-setup.exe`；后续 Python 代码和资源更新会在程序启动时下载，重启后生效。
+
+发布新版本前运行测试，然后推送递增的语义版本标签：
+
+```bash
+python -m unittest discover -s tests -p "Test*.py"
+git tag -a v1.0.23 -m "v1.0.23"
+git push python-ai master v1.0.23
+```
+
+新增或升级 Python、OpenVINO、PySide6 等二进制依赖时，应让用户重新下载安装包；不要只依赖增量更新。
 
 ## ok-script 文档
 

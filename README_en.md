@@ -93,7 +93,21 @@ The repository includes GitHub Actions workflows. Pushing a matching tag trigger
 v*.*.*
 ```
 
-The build uses `pyappify.yml` to package the app and `deploy.txt` to decide which files are synced to the update repository.
+The build uses `pyappify.yml` to package the app and `deploy.txt` to sync incremental files to
+[`liGods/python-AI-update`](https://github.com/liGods/python-AI-update). Install
+`python-AI-win32-Global-setup.exe` from Releases the first time. Later Python and asset updates are downloaded at startup
+and become active after restarting the application.
+
+Run the test suite before publishing an incremented semantic-version tag:
+
+```bash
+python -m unittest discover -s tests -p "Test*.py"
+git tag -a v1.0.23 -m "v1.0.23"
+git push python-ai master v1.0.23
+```
+
+When Python, OpenVINO, PySide6, or another binary dependency changes, publish a new full installer instead of relying
+only on the incremental update channel.
 
 ## ok-script Documentation
 
