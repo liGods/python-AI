@@ -42,6 +42,59 @@ class HandExpansionUtility:
         return asdict(self)
 
 
+def _straight_window_count(hand: Sequence[str]) -> int:
+    counts = Counter(map(_normalise_rank, hand))
+    return sum(
+        all(counts[_RANKS[index + offset]] > 0 for offset in range(5))
+        for index in range(len(_RANKS[:12]) - 4)
+    )
+
+
+def evaluate_luxun_collection(
+    hand: Sequence[str],
+    physical_action: Sequence[str],
+    projection: Any,
+) -> dict[str, float]:
+    """Measure whether 破蜀's revealed random branches complete groups or straights."""
+
+    baseline = _remaining_hand(hand, physical_action)
+    baseline_counts = Counter(map(_normalise_rank, baseline))
+    baseline_bombs = _bomb_count(baseline)
+    baseline_straights = _straight_window_count(baseline)
+    branches = tuple(getattr(projection, "random_branches", ()))
+    if not branches or "破蜀" not in tuple(getattr(projection, "triggered_skills", ())):
+        return {
+            "bomb_completion_chance": 0.0,
+            "straight_completion_chance": 0.0,
+            "trio_completion_chance": 0.0,
+            "pair_completion_chance": 0.0,
+            "expected_total": 0.0,
+            "worst_total": 0.0,
+        }
+    total_probability = sum(max(0.0, float(branch.probability)) for branch in branches) or 1.0
+    weighted = []
+    for branch in branches:
+        probability = max(0.0, float(branch.probability)) / total_probability
+        projected = tuple(map(_normalise_rank, branch.hand))
+        projected_counts = Counter(projected)
+        gained = next((rank for rank, count in projected_counts.items() if count > baseline_counts[rank]), None)
+        prior_count = baseline_counts[gained] if gained is not None else 0
+        bomb = float(_bomb_count(projected) > baseline_bombs)
+        straight = float(_straight_window_count(projected) > baseline_straights)
+        trio = float(prior_count == 2)
+        pair = float(prior_count == 1)
+        total = bomb * 12.0 + straight * 5.0 + trio * 3.0 + pair
+        weighted.append((probability, bomb, straight, trio, pair, total))
+    return {
+        "bomb_completion_chance": round(sum(value[0] * value[1] for value in weighted), 6),
+        "straight_completion_chance": round(sum(value[0] * value[2] for value in weighted), 6),
+        "trio_completion_chance": round(sum(value[0] * value[3] for value in weighted), 6),
+        "pair_completion_chance": round(sum(value[0] * value[4] for value in weighted), 6),
+        "expected_total": round(sum(value[0] * value[5] for value in weighted), 6),
+        "worst_total": round(min(value[5] for value in weighted), 6),
+    }
+
+
 def _normalise_rank(rank: str) -> str:
     return "X" if rank == "B" else "D" if rank == "R" else rank
 

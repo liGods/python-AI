@@ -138,6 +138,8 @@ class BaiJiangPaiEngine:
             return []
         player = self.state.players[actor]
         result = UnifiedActionSpace.enumerate_plays(actor, player.hand, self.state.target_ranks)
+        if not self.state.target_ranks and player.hero == "大乔" and not player.extra.get("贤助本轮取消") and self._skill_available(player, "贤助", 1):
+            result.append(LegalAction(f"skill:{actor}:贤助", "skill", actor, skill="贤助"))
         if self.state.target_ranks:
             result.append(LegalAction(f"pass:{actor}", "pass", actor))
             if not any(action.kind == "play" for action in result) and self._skill_available(player, "疑城", 3):
@@ -220,6 +222,7 @@ class BaiJiangPaiEngine:
         self._emit(events, "pass", actor=actor)
         self.state.consecutive_passes += 1
         if self.state.consecutive_passes >= 2 and self.state.trick_owner is not None:
+            self._apply_daqiao_jieyuan(events)
             self.state.target_ranks = []
             self.state.target_card_ids = []
             self.state.target_action_type = "none"
@@ -231,6 +234,22 @@ class BaiJiangPaiEngine:
         self._activate_next_interaction(self.state.current_player)
 
     def _execute_skill(self, action: LegalAction, events: list[dict[str, Any]]) -> None:
+        if action.skill == "贤助":
+            player = self.state.players[action.actor]
+            if player.hero != "大乔" or not self._skill_available(player, "贤助", 1):
+                raise SimulationError("贤助次数已经耗尽或当前武将不匹配")
+            self._queue_interaction(
+                {
+                    "actor": action.actor,
+                    "skill": "贤助",
+                    "effect": "fill_both_largest",
+                    "options": [{"target": position} for position in POSITIONS if position != action.actor],
+                    "optional": True,
+                }
+            )
+            self._emit(events, "skill", actor=action.actor, skill="贤助")
+            self._activate_next_interaction(action.actor)
+            return
         if action.skill != "疑城":
             raise SimulationError(f"尚未实现主动技能动作: {action.skill}")
         player = self.state.players[action.actor]
@@ -263,6 +282,8 @@ class BaiJiangPaiEngine:
         skip = bool(action.parameters.get("skip"))
         effect = pending["effect"]
         player = self.state.players[action.actor]
+        if skip and action.skill == "贤助":
+            player.extra["贤助本轮取消"] = True
         if not skip:
             if effect == "copy_bottom":
                 rank = action.parameters["rank"]
@@ -290,6 +311,25 @@ class BaiJiangPaiEngine:
                 self._discard_lowest(player, min(3, len(player.hand)), "夏侯惇:刚烈", events)
                 self._gain_rank(player, action.parameters["rank"], "夏侯惇:刚烈", events)
                 self._use_skill(player, "刚烈")
+            elif effect == "take_cards":
+                target = self.state.players.get(action.target or str(pending.get("target", "")))
+                if target is None or not validate_card_selection(target.hand, action.card_ids):
+                    raise SimulationError("游侠选择的目标牌已经失效")
+                for card_id in action.card_ids:
+                    card = next(card for card in target.hand if card.card_id == card_id)
+                    target.hand.remove(card)
+                    card.owner = player.position
+                    player.hand.append(card)
+                self._sort_hand(player)
+                self._sort_hand(target)
+                self._use_skill(player, "游侠")
+            elif effect == "fill_both_largest":
+                target = self.state.players.get(action.target or "")
+                if target is None or target.position == player.position:
+                    raise SimulationError("贤助目标无效")
+                self._fill_largest_to_three(player, "大乔:贤助", events)
+                self._fill_largest_to_three(target, "大乔:贤助", events)
+                self._use_skill(player, "贤助")
             else:
                 raise SimulationError(f"未知二级技能效果: {effect}")
             self._emit(events, "interaction", actor=action.actor, skill=action.skill, effect=effect)
@@ -316,6 +356,8 @@ class BaiJiangPaiEngine:
     ) -> None:
         player = self.state.players[actor]
         hero = player.hero
+        if hero == "大乔":
+            player.extra.pop("贤助本轮取消", None)
         if hero == "典韦":
             self._dianwei_after_play(player, events)
         if hero == "张飞":
@@ -374,6 +416,25 @@ class BaiJiangPaiEngine:
 
     def _on_play_beaten(self, previous: dict[str, Any], new_actor: str, events: list[dict[str, Any]]) -> None:
         owner = self.state.players[previous["actor"]]
+        attacker = self.state.players[new_actor]
+        if attacker.hero == "甘宁" and owner.hand and self._skill_available(attacker, "游侠", 3):
+            lowest = tuple(sorted(owner.hand, key=lambda card: (rank_key(card.rank), card.card_id))[:2])
+            self._queue_interaction(
+                {
+                    "actor": new_actor,
+                    "skill": "游侠",
+                    "effect": "take_cards",
+                    "target": owner.position,
+                    "options": [
+                        {
+                            "target": owner.position,
+                            "card_ids": [card.card_id for card in lowest],
+                            "ranks": [card.rank for card in lowest],
+                        }
+                    ],
+                    "optional": True,
+                }
+            )
         hero = owner.hero
         if hero == "夏侯惇" and previous.get("was_largest") and self._skill_available(owner, "刚烈", 1) and len(owner.hand) >= 3:
             highest = max(previous["ranks"], key=rank_key)
@@ -440,6 +501,33 @@ class BaiJiangPaiEngine:
             player.marks["血战万能牌"] = count
             if count >= 2:
                 player.extra["不屈失效"] = True
+
+    def _apply_daqiao_jieyuan(self, events: list[dict[str, Any]]) -> None:
+        if self.state.target_action_type != "solo" or len(self.state.target_card_ids) != 1:
+            return
+        card_id = self.state.target_card_ids[0]
+        card = next((value for value in self.state.played_cards if value.card_id == card_id), None)
+        if card is None:
+            return
+        for position in POSITIONS:
+            player = self.state.players[position]
+            if position == self.state.trick_owner or player.hero != "大乔" or not self._skill_available(player, "结缘", 1):
+                continue
+            self.state.played_cards.remove(card)
+            card.owner = position
+            player.hand.append(card)
+            self._sort_hand(player)
+            self._use_skill(player, "结缘")
+            self._emit(events, "gain", actor=position, skill="结缘", cards=[card.rank], card_ids=[card.card_id])
+            return
+
+    def _fill_largest_to_three(self, player: PlayerState, source: str, events: list[dict[str, Any]]) -> None:
+        if not player.hand:
+            return
+        largest = max((card.rank for card in player.hand), key=rank_key)
+        missing = max(0, 3 - sum(card.rank == largest for card in player.hand))
+        for _ in range(missing):
+            self._gain_rank(player, largest, source, events)
 
     def _schedule_game_start_interactions(self) -> None:
         for position in POSITIONS:

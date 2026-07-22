@@ -21,6 +21,7 @@ from ok_tasks.card_ai.heroes import (
     HERO_PRIMARY_MECHANISM,
     HERO_REGISTRY,
     OWNED_HEROES,
+    T0_HEROES,
     POLICY_SIMULATED_HEROES,
     SIMULATED_HEROES,
 )
@@ -49,6 +50,7 @@ __all__ = [
     "HeroSkillSpec",
     "LegalAction",
     "OWNED_HEROES",
+    "T0_HEROES",
     "Observation",
     "PlayerState",
     "POLICY_SIMULATED_HEROES",

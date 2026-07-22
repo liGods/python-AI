@@ -20,7 +20,7 @@ from ok_tasks.card_ai.decision.core import DecisionPolicyCore
 from ok_tasks.card_ai.decision.stage import StageContext, classify_game_stage, stage_score_components
 from ok_tasks.card_ai.decision.context import DecisionContext
 from ok_tasks.card_ai.decision.explanation import structured_score
-from ok_tasks.card_ai.decision.hero_strategy import evaluate_hand_expansion
+from ok_tasks.card_ai.decision.hero_strategy import evaluate_hand_expansion, evaluate_luxun_collection
 from ok_tasks.PolicyOptimizer import POLICY_PROFILES  # 导入经过边界限制的三套策略配置。
 
 _WILDCARD = "W"
@@ -495,7 +495,7 @@ def _context_for_score(hand, target, hero, hero_state, enemy_counts, pressure_co
     return _hero_context(state)  # 上下文不包含任何敌方暗牌。
 
 
-def _score_action(hand, action, urgent, hero=None, last_action_type=None, policy_id="balanced", target="", enemy_counts=None, hero_state=None, pressure_context=None, skill_projection=None, hero_context=None, physical_action=None, action_type=None, hand_expansion=None):  # 为一个合法生效动作生成完整技能结算后的确定性评分，同时兼容旧调用签名。
+def _score_action(hand, action, urgent, hero=None, last_action_type=None, policy_id="balanced", target="", enemy_counts=None, hero_state=None, pressure_context=None, skill_projection=None, hero_context=None, physical_action=None, action_type=None, hand_expansion=None, hero_skill_evaluation=None):  # 为一个合法生效动作生成完整技能结算后的确定性评分，同时兼容旧调用签名。
     profile = POLICY_PROFILES.get(policy_id, POLICY_PROFILES["balanced"])  # 未知策略编号安全回退到均衡策略。
     physical = physical_action if physical_action is not None else action  # 普通牌两种表示相同；万能牌动作必须按真实屏幕实体扣牌。
     exact_action_type = action_type or _action_type(action)  # 优先采用 RLCard 已确认的精确牌型，禁止统一策略再次用实体万能牌猜测。
@@ -527,6 +527,7 @@ def _score_action(hand, action, urgent, hero=None, last_action_type=None, policy
     critical_finish_risk = projection.enemy_finish_risk if pressure["mode"] == "maximum_control" else 0  # 强封锁阶段优先避开与敌方剩余张数相同的送牌型。
     critical_pressure = pressure["cost"] if pressure["mode"] == "maximum_control" else 0  # 敌方五张以内允许最大控制力优先于普通结构细分。
     medium_pressure = pressure["cost"] if pressure["mode"] == "medium_attrition" else 0  # 中盘消耗只在统一技能契约之后比较。
+    luxun_collection = -float(hero_skill_evaluation.get("expected_total", 0.0)) if hero == "陆逊" and isinstance(hero_skill_evaluation, dict) else 0.0  # 同等完整牌路下优先保留可被破蜀补成炸弹、三张、对子或顺子的骨架。
     formed_lead_types = {"straight", "pair_chain", "airplane", "trio_solo", "trio_pair", "trio"}  # 定义应在前中期优先走掉的顺子、连对、飞机和三带结构。
     lead_shape_priority = -len(action) if not target and len(hand) > 10 and exact_action_type in formed_lead_types else 0  # 仅在前中期优先走成型牌，十张内仍先清难出的孤张。
     lead_shape_rank = max(INDEX[card] for card in action) if lead_shape_priority else len(INDEX)  # 生效动作不含万能牌，可安全按主点数稳定排序。
@@ -536,6 +537,7 @@ def _score_action(hand, action, urgent, hero=None, last_action_type=None, policy
     legacy_refinements = (
         critical_finish_risk,
         critical_pressure,
+        luxun_collection,
         bomb_penalty,
         lead_shape_priority,
         lead_shape_rank,
@@ -609,13 +611,14 @@ def _score_action_with_stage(
     hand, action, urgent, hero=None, last_action_type=None, policy_id="balanced", target="",
     enemy_counts=None, hero_state=None, pressure_context=None, skill_projection=None,
     hero_context=None, physical_action=None, action_type=None, game_stage=None, hand_expansion=None,
+    hero_skill_evaluation=None,
 ):
     """Append public-stage refinements after all existing legacy score fields."""
 
     legacy_score = _score_action(
         hand, action, urgent, hero, last_action_type, policy_id, target, enemy_counts,
         hero_state, pressure_context, skill_projection, hero_context, physical_action,
-        action_type, hand_expansion,
+        action_type, hand_expansion, hero_skill_evaluation,
     )
     context = hero_context or _context_for_score(hand, target, hero, hero_state, enemy_counts, pressure_context)
     stage = game_stage or classify_game_stage(_stage_context(hand, target, enemy_counts, pressure_context, context))
@@ -654,6 +657,7 @@ def _build_candidate_records(hand, target, enemy_counts, hero=None, last_action_
             projection,
             game_stage.value,
         )
+        skill_evaluation = evaluate_guan_yinping_action(hand, physical_action, hero_state) if hero == "关银屏" else evaluate_zhao_yun_action(hand, effective_action, hero_state, pressure_context) if hero == "赵云" else evaluate_luxun_collection(hand, physical_action, projection) if hero == "陆逊" else None
         score = _score_action_with_stage(
             hand,
             effective_action,
@@ -671,8 +675,8 @@ def _build_candidate_records(hand, target, enemy_counts, hero=None, last_action_
             action_type=exact_action_type,
             game_stage=game_stage,
             hand_expansion=hand_expansion,
+            hero_skill_evaluation=skill_evaluation,
         )
-        skill_evaluation = evaluate_guan_yinping_action(hand, physical_action, hero_state) if hero == "关银屏" else evaluate_zhao_yun_action(hand, effective_action, hero_state, pressure_context) if hero == "赵云" else None
         record = CandidateDecision(
             effective_action=effective_action,
             physical_action=physical_action,
@@ -932,6 +936,7 @@ _SCORE_REASON_LABELS = (
     "技能资源与标记价值",
     "敌方关键收尾牌型风险",
     "紧急控牌强度",
+    "陆逊破蜀集炸弹与顺子收益",
     "炸弹成本",
     "主动成型牌优先级",
     "成型牌点数",

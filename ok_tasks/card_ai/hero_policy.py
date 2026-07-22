@@ -1112,6 +1112,11 @@ def apply_skill_choice(
             post_hand = remove_exact(hand, selected)
         elif pending_effect in {"copy_bottom", "gain_rank"}:
             post_hand = _sort_hand(hand + selected[:1]) if selected else None
+        elif pending_effect == "take_cards":
+            post_hand = _sort_hand(hand + selected) if selected else None
+        elif pending_effect == "fill_both_largest":
+            largest = max(hand, key=lambda value: RANK_INDEX.get(value, -1), default=None)
+            post_hand = _sort_hand(hand + (largest,) * max(0, 3 - hand.count(largest))) if largest else hand
         elif pending_effect == "convert_group":
             operation = str(choice.parameters.get("operation", ""))
             if operation == "solo_to_pair" and selected and hand.count(selected[0]) == 1:
@@ -1259,6 +1264,8 @@ def _choose_optional_outcomes(
     action: LegalAction | Sequence[str] | str | None,
     route_evaluator: RouteEvaluator | None,
 ) -> tuple[EffectOutcome, ...]:
+    if spec.effect == "inspect_and_take_two_lowest" and not isinstance(context.extra.get("pending_interaction"), Mapping):
+        return (EffectOutcome(hand, label="游侠:等待公开最低牌"),)
     choices = enumerate_skill_choices(context, spec, action)
     candidates: list[tuple[tuple[Any, ...], tuple[EffectOutcome, ...]]] = []
     for choice in choices:

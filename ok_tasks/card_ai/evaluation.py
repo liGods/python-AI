@@ -182,11 +182,13 @@ def evaluate_hero_policy_paired(
         requested = deals_per_hero * len(POSITIONS)
         candidate_interval = wilson_interval(candidate_wins, completed)
         baseline_interval = wilson_interval(baseline_wins, completed)
-        passed = (
+        paired_quality_passed = (
             completed == requested
             and not failures
             and candidate_interval[0] + 1e-12 >= baseline_interval[0]
         )
+        authoritative_simulation = all(skill.sim_verified for skill in HERO_REGISTRY[hero])
+        passed = authoritative_simulation and paired_quality_passed
         hero_reports[hero] = {
             "requested_samples": requested,
             "completed_samples": completed,
@@ -207,6 +209,8 @@ def evaluate_hero_policy_paired(
             "positions": position_reports,
             "legal_action_rate": 1.0 if completed == requested and not failures else completed / requested,
             "state_errors": len(failures),
+            "authoritative_simulation": authoritative_simulation,
+            "paired_quality_passed": paired_quality_passed,
             "sim_verified": passed,
             "failures": failures,
         }

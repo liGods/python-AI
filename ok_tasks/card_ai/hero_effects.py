@@ -243,7 +243,7 @@ _RANDOM_RANKS: dict[str, tuple[str, ...]] = {
     "gain_equal_above_six": tuple(CARD_ORDER[3:]),
     "gain_high_pair_then_wildcard": ("J", "Q", "K", "A", "2"),
     "gain_joker_or_turn_two_solos_to_pairs": ("X", "D"),
-    "gain_random_above_ten": tuple(CARD_ORDER[7:]),
+    "gain_random_above_ten": tuple(CARD_ORDER[8:]),
     "gain_random_card": tuple(CARD_ORDER),
     "gain_random_jqk": ("J", "Q", "K"),
     "largest_to_random_joker": ("X", "D"),
