@@ -29,12 +29,14 @@ def wilson_interval(successes: int, samples: int, z: float = 1.959963984540054) 
     return max(0.0, center - radius), min(1.0, center + radius)
 
 
-def _skill_decision_metrics(events: list[Any], position: str) -> tuple[int, int, dict[str, int]]:
+def _skill_decision_metrics(events: list[Any], position: str) -> tuple[int, int, dict[str, int], dict[str, int], dict[str, float]]:
     """Count only chosen, publicly logged skill projections for one seat."""
 
     decisions = 0
     triggers = 0
     rule_counts: dict[str, int] = {}
+    stage_counts: dict[str, int] = {}
+    expansion_totals = {"expected_total": 0.0, "worst_total": 0.0}
     for event in events:
         if event.actor != position:
             continue
@@ -43,11 +45,24 @@ def _skill_decision_metrics(events: list[Any], position: str) -> tuple[int, int,
         if not rules:
             continue
         decisions += 1
+        stage = str(event.metadata.get("game_stage", "unknown"))
+        stage_counts[stage] = stage_counts.get(stage, 0) + 1
+        chosen = decision.get("chosen") if isinstance(decision, dict) else None
+        candidate = next(
+            (
+                value for value in decision.get("candidates", ())
+                if isinstance(value, dict) and value.get("physical_action") == chosen
+            ),
+            None,
+        )
+        expansion = candidate.get("hand_expansion", {}) if isinstance(candidate, dict) else {}
+        for field in expansion_totals:
+            expansion_totals[field] += float(expansion.get(field, 0.0))
         for rule in rules:
             rule_id = str(rule)
             rule_counts[rule_id] = rule_counts.get(rule_id, 0) + 1
             triggers += 1
-    return decisions, triggers, rule_counts
+    return decisions, triggers, rule_counts, stage_counts, expansion_totals
 
 
 def evaluate_hero_policy_paired(
@@ -76,6 +91,8 @@ def evaluate_hero_policy_paired(
         skill_decisions = 0
         skill_triggers = 0
         triggered_rule_counts: dict[str, int] = {}
+        skill_stage_counts: dict[str, int] = {}
+        hand_expansion_totals = {"expected_total": 0.0, "worst_total": 0.0}
         completed = 0
         failures: list[dict[str, Any]] = []
         position_reports = {
@@ -90,6 +107,8 @@ def evaluate_hero_policy_paired(
                 "skill_decisions": 0,
                 "skill_triggers": 0,
                 "triggered_rule_counts": {},
+                "skill_stage_counts": {},
+                "hand_expansion_totals": {"expected_total": 0.0, "worst_total": 0.0},
             }
             for position in POSITIONS
         }
@@ -130,7 +149,7 @@ def evaluate_hero_policy_paired(
 
                 candidate_reward = _reward_for(position, candidate_summary["winner"])
                 baseline_reward = _reward_for(position, baseline_summary["winner"])
-                decision_count, trigger_count, rule_counts = _skill_decision_metrics(candidate_events, position)
+                decision_count, trigger_count, rule_counts, stage_counts, expansion_totals = _skill_decision_metrics(candidate_events, position)
                 candidate_wins += int(candidate_reward > 0)
                 baseline_wins += int(baseline_reward > 0)
                 paired_improvements += int(candidate_reward > baseline_reward)
@@ -151,6 +170,13 @@ def evaluate_hero_policy_paired(
                     triggered_rule_counts[rule_id] = triggered_rule_counts.get(rule_id, 0) + count
                     rule_map = seat_report["triggered_rule_counts"]
                     rule_map[rule_id] = rule_map.get(rule_id, 0) + count
+                for stage, count in stage_counts.items():
+                    skill_stage_counts[stage] = skill_stage_counts.get(stage, 0) + count
+                    stage_map = seat_report["skill_stage_counts"]
+                    stage_map[stage] = stage_map.get(stage, 0) + count
+                for field, value in expansion_totals.items():
+                    hand_expansion_totals[field] += value
+                    seat_report["hand_expansion_totals"][field] += value
                 completed += 1
 
         requested = deals_per_hero * len(POSITIONS)
@@ -176,6 +202,8 @@ def evaluate_hero_policy_paired(
             "skill_decisions": skill_decisions,
             "skill_triggers": skill_triggers,
             "triggered_rule_counts": triggered_rule_counts,
+            "skill_stage_counts": skill_stage_counts,
+            "hand_expansion_totals": {field: round(value, 6) for field, value in hand_expansion_totals.items()},
             "positions": position_reports,
             "legal_action_rate": 1.0 if completed == requested and not failures else completed / requested,
             "state_errors": len(failures),

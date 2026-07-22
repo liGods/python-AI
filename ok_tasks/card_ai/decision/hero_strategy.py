@@ -12,6 +12,23 @@ _RANK_INDEX = {rank: index for index, rank in enumerate(_RANKS)}
 
 
 @dataclass(frozen=True)
+class HandExpansionWeights:
+    low_single_relief: float
+    rank_upgrade: float
+    structure_gain: float
+    action_option_gain: float
+    bomb_gain: float
+
+
+HAND_EXPANSION_WEIGHTS = {
+    "opening": HandExpansionWeights(3.0, 1.2, 2.4, 1.8, 3.0),
+    "midgame": HandExpansionWeights(4.0, 1.5, 2.0, 1.5, 5.0),
+    "endgame": HandExpansionWeights(5.0, 2.0, 2.5, 2.0, 5.0),
+    "emergency": HandExpansionWeights(2.5, 2.5, 1.2, 1.0, 7.0),
+}
+
+
+@dataclass(frozen=True)
 class HandExpansionUtility:
     low_single_relief: float
     rank_upgrade: float
@@ -113,13 +130,23 @@ def _bomb_count(hand: Sequence[str]) -> int:
     return sum(count >= 4 for count in counts.values()) + int(counts["X"] > 0 and counts["D"] > 0)
 
 
-def _branch_utility(baseline: Sequence[str], projected: Sequence[str]) -> tuple[float, ...]:
+def _branch_utility(
+    baseline: Sequence[str],
+    projected: Sequence[str],
+    weights: HandExpansionWeights,
+) -> tuple[float, ...]:
     low_relief = _low_single_burden(baseline) - _low_single_burden(projected)
     rank_upgrade = _average_rank(projected) - _average_rank(baseline)
     structure_gain = _structure_value(projected) - _structure_value(baseline)
     option_gain = float(_action_options(projected) - _action_options(baseline))
     bomb_gain = float(_bomb_count(projected) - _bomb_count(baseline))
-    total = 4.0 * low_relief + 1.5 * rank_upgrade + 2.0 * structure_gain + 1.5 * option_gain + 5.0 * bomb_gain
+    total = (
+        weights.low_single_relief * low_relief
+        + weights.rank_upgrade * rank_upgrade
+        + weights.structure_gain * structure_gain
+        + weights.action_option_gain * option_gain
+        + weights.bomb_gain * bomb_gain
+    )
     return low_relief, rank_upgrade, structure_gain, option_gain, bomb_gain, total
 
 
@@ -127,10 +154,12 @@ def evaluate_hand_expansion(
     hand: Sequence[str],
     physical_action: Sequence[str],
     projection: Any,
+    game_stage: str = "midgame",
 ) -> HandExpansionUtility:
     """Compare the no-skill post-play hand with every projected skill branch."""
 
     baseline = _remaining_hand(hand, physical_action)
+    weights = HAND_EXPANSION_WEIGHTS.get(game_stage, HAND_EXPANSION_WEIGHTS["midgame"])
     branches = tuple(getattr(projection, "random_branches", ()))
     if branches:
         outcomes = tuple((float(branch.probability), tuple(branch.hand)) for branch in branches)
@@ -138,7 +167,7 @@ def evaluate_hand_expansion(
         outcomes = ((1.0, tuple(getattr(projection, "post_hand", baseline))),)
     probability_sum = sum(max(0.0, probability) for probability, _ in outcomes) or 1.0
     values = [
-        (max(0.0, probability) / probability_sum, _branch_utility(baseline, projected))
+        (max(0.0, probability) / probability_sum, _branch_utility(baseline, projected, weights))
         for probability, projected in outcomes
     ]
     expected = [sum(probability * utility[index] for probability, utility in values) for index in range(6)]

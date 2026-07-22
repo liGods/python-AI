@@ -43,6 +43,12 @@ class TestHeroHandExpansionUtility(unittest.TestCase):
         self.assertEqual(0.0, utility.expected_total)
         self.assertEqual(0.0, utility.worst_total)
 
+    def test_emergency_values_new_bomb_more_than_opening(self):
+        projection = _projection(("7", "7", "7", "7"))
+        opening = evaluate_hand_expansion(("3", "7", "7", "7"), (), projection, "opening")
+        emergency = evaluate_hand_expansion(("3", "7", "7", "7"), (), projection, "emergency")
+        self.assertGreater(emergency.expected_total, opening.expected_total)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -209,6 +209,9 @@ class StableRulePolicy:
             "candidates": [
                 {
                     "action_id": action_by_physical[record.physical_action].action_id,
+                    "physical_action": record.physical_action,
+                    "game_stage": record.game_stage,
+                    "hand_expansion": dict(record.hand_expansion),
                     "score": list(record.score),
                     "triggered_rules": list(record.projection.triggered_rules),
                     "reason": record.projection.reason,

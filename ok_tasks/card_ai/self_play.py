@@ -8,6 +8,7 @@ from time import monotonic
 from typing import Any
 
 from ok_tasks.card_ai.engine import BaiJiangPaiEngine, SimulationError
+from ok_tasks.card_ai.decision.stage import GameStage, StageContext, classify_game_stage
 from ok_tasks.card_ai.heroes import HERO_REGISTRY, SIMULATED_HEROES
 from ok_tasks.card_ai.policies import Policy, RandomLegalPolicy, StableRulePolicy
 from ok_tasks.card_ai.schema import POSITIONS, TrajectoryEvent
@@ -50,6 +51,7 @@ class SelfPlayRunner:
             metadata = {
                 "policy_id": policy.policy_id,
                 "hero": engine.state.players[actor].hero,
+                "game_stage": _public_game_stage(observation),
             }
             decision = getattr(policy, "last_decision", None)
             if decision is not None:
@@ -86,6 +88,7 @@ class SelfPlayRunner:
                 }
                 return events, summary
         raise SimulationError(f"牌局超过最大步数仍未结束: {engine.state.game_id}")
+
 
     def run(self, config: SelfPlayConfig, output_root: str | Path) -> dict[str, Any]:
         root = Path(output_root)
@@ -175,6 +178,32 @@ class SelfPlayRunner:
         }
         atomic_json(root / "self_play_summary.json", report)
         return report
+
+
+def _public_game_stage(observation: Any) -> str:
+    """Classify a trajectory event from the actor's observation only."""
+
+    others = tuple(seat for seat in POSITIONS if seat != observation.observer)
+    counts = dict(zip(others, observation.opponent_card_counts))
+    enemies = others if observation.observer == observation.landlord else (observation.landlord,)
+    allies = tuple(seat for seat in others if seat not in enemies)
+    seen = [rank for event in observation.history for rank in event.get("ranks", ())]
+    seen.extend(observation.target_ranks)
+    stage = classify_game_stage(
+        StageContext(
+            own_card_count=len(observation.hand),
+            position=observation.observer,
+            enemy_card_counts=tuple(counts[seat] for seat in enemies),
+            teammate_card_count=counts.get(allies[0]) if allies else None,
+            table_has_cards=bool(observation.target_ranks),
+            table_is_teammate=observation.trick_owner in allies,
+            seen_bombs=sum(seen.count(rank) >= 4 for rank in set(seen) if rank not in {"X", "D", "B", "R"}),
+            seen_jokers=sum(rank in {"X", "D", "B", "R"} for rank in seen),
+            seen_twos=seen.count("2"),
+            one_turn_finish_risk=min((counts[seat] for seat in enemies), default=17) <= 1,
+        )
+    )
+    return GameStage(stage).value
 
 
 def load_game_summary(path: str | Path) -> dict[str, Any]:

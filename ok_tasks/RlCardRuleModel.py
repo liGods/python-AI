@@ -652,6 +652,7 @@ def _build_candidate_records(hand, target, enemy_counts, hero=None, last_action_
             context.hand,
             _to_internal(physical_action),
             projection,
+            game_stage.value,
         )
         score = _score_action_with_stage(
             hand,
