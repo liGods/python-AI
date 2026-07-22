@@ -51,6 +51,12 @@ class SelfPlayRunner:
                 "policy_id": policy.policy_id,
                 "hero": engine.state.players[actor].hero,
             }
+            decision = getattr(policy, "last_decision", None)
+            if decision is not None:
+                # Policy explanations contain only public candidate/projection
+                # data, so evaluation can attribute observed skill benefits
+                # without recording a simulator opponent hand.
+                metadata["decision"] = dict(decision)
             if include_full_state:
                 metadata["full_state"] = engine.state.to_dict()
             result = engine.step(action)

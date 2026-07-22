@@ -196,7 +196,16 @@ class StableRulePolicy:
             "skill_after_cards": selected_projection.expected_remaining_cards,
             "random_branches": [branch.to_dict() for branch in selected_projection.random_branches],
             "reason": selected_projection.reason,
-            "search": vars(decision.search) if decision.search else None,
+            "search": (
+                {
+                    "nodes": decision.search.nodes,
+                    "depth": decision.search.depth,
+                    "elapsed_ms": decision.search.elapsed_ms,
+                    "reason": decision.search.reason,
+                    "triggered": decision.search.triggered,
+                }
+                if decision.search else None
+            ),
             "candidates": [
                 {
                     "action_id": action_by_physical[record.physical_action].action_id,

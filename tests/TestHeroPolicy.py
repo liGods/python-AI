@@ -604,6 +604,10 @@ class TestHeroPolicyContracts(unittest.TestCase):
         self.assertEqual(3, hero["completed_samples"])
         self.assertEqual(1.0, hero["legal_action_rate"])
         self.assertEqual(0, hero["state_errors"])
+        self.assertEqual(set(POSITIONS), set(hero["positions"]))
+        self.assertEqual(3, sum(position["completed_samples"] for position in hero["positions"].values()))
+        self.assertIn("skill_triggers", hero)
+        self.assertIn("triggered_rule_counts", hero)
 
 
 if __name__ == "__main__":

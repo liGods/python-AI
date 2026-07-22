@@ -29,6 +29,27 @@ def wilson_interval(successes: int, samples: int, z: float = 1.959963984540054) 
     return max(0.0, center - radius), min(1.0, center + radius)
 
 
+def _skill_decision_metrics(events: list[Any], position: str) -> tuple[int, int, dict[str, int]]:
+    """Count only chosen, publicly logged skill projections for one seat."""
+
+    decisions = 0
+    triggers = 0
+    rule_counts: dict[str, int] = {}
+    for event in events:
+        if event.actor != position:
+            continue
+        decision = event.metadata.get("decision", {}) if isinstance(event.metadata, dict) else {}
+        rules = decision.get("triggered_rules", ()) if isinstance(decision, dict) else ()
+        if not rules:
+            continue
+        decisions += 1
+        for rule in rules:
+            rule_id = str(rule)
+            rule_counts[rule_id] = rule_counts.get(rule_id, 0) + 1
+            triggers += 1
+    return decisions, triggers, rule_counts
+
+
 def evaluate_hero_policy_paired(
     heroes: tuple[str, ...] | None = None,
     deals_per_hero: int = 3,
@@ -52,8 +73,26 @@ def evaluate_hero_policy_paired(
         paired_improvements = 0
         paired_regressions = 0
         paired_ties = 0
+        skill_decisions = 0
+        skill_triggers = 0
+        triggered_rule_counts: dict[str, int] = {}
         completed = 0
         failures: list[dict[str, Any]] = []
+        position_reports = {
+            position: {
+                "requested_samples": deals_per_hero,
+                "completed_samples": 0,
+                "candidate_wins": 0,
+                "baseline_wins": 0,
+                "paired_improvements": 0,
+                "paired_regressions": 0,
+                "paired_ties": 0,
+                "skill_decisions": 0,
+                "skill_triggers": 0,
+                "triggered_rule_counts": {},
+            }
+            for position in POSITIONS
+        }
         for deal_index in range(deals_per_hero):
             deal_seed = seed + hero_index * deals_per_hero + deal_index
             for position in POSITIONS:
@@ -66,7 +105,7 @@ def evaluate_hero_policy_paired(
                     seat: LegacyStableRulePolicy() for seat in POSITIONS
                 }
                 try:
-                    _, candidate_summary = SelfPlayRunner(candidate_policies).run_game(
+                    candidate_events, candidate_summary = SelfPlayRunner(candidate_policies).run_game(
                         deal_seed,
                         hero_map,
                         maximum_steps,
@@ -91,11 +130,27 @@ def evaluate_hero_policy_paired(
 
                 candidate_reward = _reward_for(position, candidate_summary["winner"])
                 baseline_reward = _reward_for(position, baseline_summary["winner"])
+                decision_count, trigger_count, rule_counts = _skill_decision_metrics(candidate_events, position)
                 candidate_wins += int(candidate_reward > 0)
                 baseline_wins += int(baseline_reward > 0)
                 paired_improvements += int(candidate_reward > baseline_reward)
                 paired_regressions += int(candidate_reward < baseline_reward)
                 paired_ties += int(candidate_reward == baseline_reward)
+                skill_decisions += decision_count
+                skill_triggers += trigger_count
+                seat_report = position_reports[position]
+                seat_report["completed_samples"] += 1
+                seat_report["candidate_wins"] += int(candidate_reward > 0)
+                seat_report["baseline_wins"] += int(baseline_reward > 0)
+                seat_report["paired_improvements"] += int(candidate_reward > baseline_reward)
+                seat_report["paired_regressions"] += int(candidate_reward < baseline_reward)
+                seat_report["paired_ties"] += int(candidate_reward == baseline_reward)
+                seat_report["skill_decisions"] += decision_count
+                seat_report["skill_triggers"] += trigger_count
+                for rule_id, count in rule_counts.items():
+                    triggered_rule_counts[rule_id] = triggered_rule_counts.get(rule_id, 0) + count
+                    rule_map = seat_report["triggered_rule_counts"]
+                    rule_map[rule_id] = rule_map.get(rule_id, 0) + count
                 completed += 1
 
         requested = deals_per_hero * len(POSITIONS)
@@ -118,6 +173,10 @@ def evaluate_hero_policy_paired(
             "paired_improvements": paired_improvements,
             "paired_regressions": paired_regressions,
             "paired_ties": paired_ties,
+            "skill_decisions": skill_decisions,
+            "skill_triggers": skill_triggers,
+            "triggered_rule_counts": triggered_rule_counts,
+            "positions": position_reports,
             "legal_action_rate": 1.0 if completed == requested and not failures else completed / requested,
             "state_errors": len(failures),
             "sim_verified": passed,

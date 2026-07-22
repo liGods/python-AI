@@ -44,3 +44,26 @@ def projection_features(candidate: CandidateDecision) -> dict[str, Any]:
         "enemy_finish_risk": projection.enemy_finish_risk,
         "control_card_cost": projection.control_card_cost,
     }
+
+
+def skill_utility_features(candidate: CandidateDecision) -> dict[str, Any]:
+    """Expose the one projection-based skill utility used by every candidate.
+
+    These values are already part of ``SkillProjection.score_key`` and the live
+    legacy sort key.  Keeping them together makes hero benefit comparable for
+    ordinary plays, pass projections, and simulator legal actions without
+    introducing a second scoring formula.
+    """
+
+    projection = candidate.projection
+    return {
+        "triggered_rules": list(projection.triggered_rules),
+        "triggered_skills": list(projection.triggered_skills),
+        "resource_value": projection.skill_resource_value,
+        "expected_risk": projection.expected_skill_risk,
+        "worst_risk": projection.worst_skill_risk,
+        "external_skill_cost": projection.external_skill_cost,
+        "target_relation_cost": projection.target_relation_cost,
+        "resource_changes": dict(projection.resource_changes),
+        "random_branch_count": len(projection.random_branches),
+    }
